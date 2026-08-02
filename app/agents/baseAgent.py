@@ -5,7 +5,7 @@ SYSTEM_PROMPT for subclasses to supply."""
 from __future__ import annotations
 
 from app.llmClient import LLMClient
-from app.schema import Context, Diff, Finding, Severity
+from app.schema import Context, Diff, filePath, Finding, Severity
 
 
 class BaseAgent:
@@ -15,18 +15,39 @@ class BaseAgent:
     def __init__(self, llm_client: LLMClient):
         self._llm = llm_client
 
-    async def review(self, diff: Diff, context: Context) -> list[Finding]:
-        prompt = self._build_prompt(diff, context)
-        raw_findings = await self._llm.complete_json(self.SYSTEM_PROMPT, prompt)
-        return [self._to_finding(item) for item in raw_findings if "message" in item]
+    async def review(self, 
+                     diff: Diff | None = None, 
+                     context: Context | None = None,
+                     file: filePath | None = None,
+                    ) -> list[Finding]:
 
-    def _build_prompt(self, diff: Diff, context: Context) -> str:
+        if diff:
+            prompt = self._build_prompt(diff=diff, context=context)
+            raw_findings = await self._llm.complete_json(self.SYSTEM_PROMPT, prompt)
+            return [self._to_finding(item) for item in raw_findings if "message" in item]
+        elif file:
+            prompt = self._build_prompt(file=file, context=context)
+            raw_findings = await self._llm.complete_json(self.SYSTEM_PROMPT, prompt)
+            return [self._to_finding(item) for item in raw_findings if "message" in item]
+
+    def _build_prompt(self,
+                      diff: Diff | None = None, 
+                      context: Context | None = None,
+                      file: filePath | None = None,
+                    ) -> str:
         parts = []
-        for f in diff.files:
-            parts.append(f"--- {f.path} ---\n{f.hunk}")
-            if f.path in context.snippets:
-                parts.append(f"[context]\n{context.snippets[f.path]}")
-        return "\n\n".join(parts)
+        if diff:
+            for f in diff.files:
+                parts.append(f"--- {f.path} ---\n{f.hunk}")
+                if f.path in context.snippets:
+                    parts.append(f"[context]\n{context.snippets[f.path]}")
+            return "\n\n".join(parts)
+        if file:
+            parts.append(f"--- {file}")
+            if file in context.snippets:
+                parts.append(f"[context]\n{context.snippets[file]}")
+            return "\n\n".join(parts)
+            
 
     def _to_finding(self, item: dict) -> Finding:
         return Finding(

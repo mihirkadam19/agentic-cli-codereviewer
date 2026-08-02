@@ -9,15 +9,25 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.schema import Context, Diff
+from app.schema import Context, Diff, filePath
 
 MAX_CHARS_PER_FILE = 4000
 
 
-def build_context(diff: Diff, repo_root: str = ".") -> Context:
+def build_context(
+        diff: Diff | None = None,
+        file: filePath | None = None,
+        repo_root: str = ".",
+    ) -> Context:
     snippets: dict[str, str] = {}
-    for f in diff.files:
-        file_path = Path(repo_root) / f.path
+
+    if diff:
+        for f in diff.files:
+            file_path = Path(repo_root) / f.path
+            if file_path.exists():
+                snippets[f.path] = file_path.read_text()[:MAX_CHARS_PER_FILE]
+    elif file:
+        file_path = Path(file)
         if file_path.exists():
-            snippets[f.path] = file_path.read_text()[:MAX_CHARS_PER_FILE]
+            snippets[file] = file_path.read_text()
     return Context(snippets=snippets)

@@ -33,6 +33,9 @@ class Context(BaseModel):
 
     snippets: dict[str, str] = Field(default_factory=dict)  # file path -> context text
 
+class filePath(BaseModel):
+    """File path for single file."""
+    filePath: str
 
 class Finding(BaseModel):
     """A single issue identified by a review agent."""

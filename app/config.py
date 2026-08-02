@@ -14,6 +14,7 @@ DEFAULT_CONFIG = {
 }
 
 
+
 def load_config(path: str | Path = ".codechk.toml") -> dict:
     path = Path(path)
     if not path.exists():

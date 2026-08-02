@@ -44,16 +44,33 @@ def review(against: str = typer.Option("HEAD", help="Git ref to diff against")):
         typer.echo("No changes to review.")
         raise typer.Exit()
 
-    context = build_context(diff)
+    context = build_context(diff=diff)
 
     llm_client = LLMClient(model=config["model"])
     agents = [_AGENT_REGISTRY[name](llm_client) for name in config["agents"] if name in _AGENT_REGISTRY]
 
     orchestrator = Orchestrator(agents)
-    findings = asyncio.run(orchestrator.run(diff, context))
+    findings = asyncio.run(orchestrator.run(diff=diff, context=context))
 
     print_findings(findings)
 
+@cliApp.command()
+def security(file: str = typer.Option(..., help="Enter the file path")):
+    """Perform a security scan"""
+    #if not file:
+    #    typer.echo("Please provide the file path")
+    #    raise typer.Exit()
+    
+    config = load_config()
+    config["agents"] = ["security"]
+
+    context = build_context(file=file)
+
+    llm_client = LLMClient(model=config["model"])
+    agents = [_AGENT_REGISTRY["security"](llm_client)]
+    orchestrator = Orchestrator(agents)
+    findings = asyncio.run(orchestrator.run(file=file, context=context))
+    print_findings(findings)
 
 if __name__ == "__main__":
     cliApp()

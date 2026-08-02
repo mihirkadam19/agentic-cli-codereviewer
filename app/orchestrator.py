@@ -9,19 +9,24 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.baseAgent import BaseAgent
 from app.llmClient import LLMClient
-from app.schema import Context, Diff, Finding
+from app.schema import Context, Diff, filePath, Finding
 
 
-class ReviewState(TypedDict):
+class ReviewState(TypedDict, total = False):
     diff: Diff
     context: Context
+    file: filePath
     findings: Annotated[list[Finding], operator.add]
 
 
 def _make_agent_node(agent: BaseAgent):
     async def node(state: ReviewState) -> dict:
         try:
-            result = await agent.review(state["diff"], state["context"])
+            result = await agent.review(
+                diff=state.get("diff"), 
+                context=state.get("context"), 
+                file=state.get("file")
+            )
         except Exception as exc:
             print(f"[warn] agent '{agent.name}' failed: {exc}")
             result = []
@@ -55,8 +60,19 @@ class Orchestrator:
         builder.add_edge("aggregate", END)
         return builder.compile()
 
-    async def run(self, diff: Diff, context: Context) -> list[Finding]:
-        result = await self._graph.ainvoke(
-            {"diff": diff, "context": context, "findings": []}
-        )
+    async def run(self, 
+                  diff: Diff | None = None, 
+                  context: Context | None = None,
+                  file: filePath | None = None,
+                ) -> list[Finding]:
+
+        if diff:
+            result = await self._graph.ainvoke(
+                {"diff": diff, "context": context, "findings": []}
+            )
+        elif file:
+            result = await self._graph.ainvoke(
+                {"file": file, "context": context, "findings": []}
+            )
+
         return result["findings"]
