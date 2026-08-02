@@ -72,5 +72,25 @@ def security(file: str = typer.Option(..., help="Enter the file path")):
     findings = asyncio.run(orchestrator.run(file=file, context=context))
     print_findings(findings)
 
+
+@cliApp.command()
+def performance(file: str = typer.Option(..., help="Enter the file path")):
+    """Perform a security scan"""
+    #if not file:
+    #    typer.echo("Please provide the file path")
+    #    raise typer.Exit()
+    
+    config = load_config()
+    config["agents"] = ["performance"]
+
+    context = build_context(file=file)
+
+    llm_client = LLMClient(model=config["model"])
+    agents = [_AGENT_REGISTRY["performance"](llm_client)]
+    orchestrator = Orchestrator(agents)
+    findings = asyncio.run(orchestrator.run(file=file, context=context))
+    print_findings(findings)
+
+
 if __name__ == "__main__":
     cliApp()
