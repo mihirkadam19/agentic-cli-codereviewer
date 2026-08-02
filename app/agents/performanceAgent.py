@@ -11,7 +11,5 @@ only: N+1 queries, unnecessary loops or allocations, blocking calls in
 async code, missing indexes implied by query patterns, and algorithmic
 complexity problems. Ignore style, security, and general code quality.
 
-Respond with ONLY a JSON array, no prose, no markdown fences. Each item:
-{"file": str, "line": int or null, "severity": "info"|"warning"|"error",
- "message": str, "suggestion": str or null}
+Report findings using the report_findings tool.
 """

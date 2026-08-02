@@ -6,10 +6,34 @@ agent, and never inside the orchestrator.
 """
 from __future__ import annotations
 
-import json
 import os
 
 import anthropic
+
+REPORT_FINDINGS_TOOL = {
+    "name": "report_findings",
+    "description": "Report code review findings as structured data. Call this even if there are zero findings -- pass an empty list.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "file": {"type": "string", "description": "Path of the file this finding applies to"},
+                        "line": {"type": ["integer", "null"], "description": "Line number, or null if not line-specific"},
+                        "severity": {"type": "string", "enum": ["info", "warning", "error"]},
+                        "message": {"type": "string", "description": "What the issue is"},
+                        "suggestion": {"type": ["string", "null"], "description": "How to fix it, or null"},
+                    },
+                    "required": ["file", "severity", "message"],
+                },
+            }
+        },
+        "required": ["findings"],
+    },
+}
 
 
 class LLMClient:
@@ -19,29 +43,24 @@ class LLMClient:
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY")
         )
 
-    async def complete_json(self, system: str, user: str, max_tokens: int = 2000) -> list[dict]:
-        """Send a prompt and parse a JSON array out of the response.
+    async def complete_findings(self, system: str, user: str, max_tokens: int = 2000) -> list[dict]:
+        """Send a prompt and get back structured findings via a forced tool call.
 
-        Centralizing parsing here means every agent gets the same
-        tolerance for stray markdown fences, and any future retry logic
-        only needs to be written once.
+        No JSON parsing, no markdown-fence stripping, no silent [] fallback
+        on a malformed response -- the API validates the shape before it
+        ever reaches this code.
         """
         response = await self._client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
+            tools=[REPORT_FINDINGS_TOOL],
+            tool_choice={"type": "tool", "name": "report_findings"},
         )
-        text = "".join(block.text for block in response.content if block.type == "text").strip()
 
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text.split("\n", 1)[-1]
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "report_findings":
+                return block.input.get("findings", [])
 
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            return []
-
-        return parsed if isinstance(parsed, list) else []
+        return []

@@ -20,15 +20,9 @@ class BaseAgent:
                      context: Context | None = None,
                      file: filePath | None = None,
                     ) -> list[Finding]:
-
-        if diff:
-            prompt = self._build_prompt(diff=diff, context=context)
-            raw_findings = await self._llm.complete_json(self.SYSTEM_PROMPT, prompt)
-            return [self._to_finding(item) for item in raw_findings if "message" in item]
-        elif file:
-            prompt = self._build_prompt(file=file, context=context)
-            raw_findings = await self._llm.complete_json(self.SYSTEM_PROMPT, prompt)
-            return [self._to_finding(item) for item in raw_findings if "message" in item]
+        prompt = self._build_prompt(diff=diff, file=file, context=context)
+        raw_findings = await self._llm.complete_findings(self.SYSTEM_PROMPT, prompt)
+        return [self._to_finding(item) for item in raw_findings if "message" in item]
 
     def _build_prompt(self,
                       diff: Diff | None = None, 
