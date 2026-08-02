@@ -7,7 +7,7 @@ agent, and never inside the orchestrator.
 from __future__ import annotations
 
 import os
-
+import app.cache as cache
 import anthropic
 
 REPORT_FINDINGS_TOOL = {
@@ -46,10 +46,14 @@ class LLMClient:
     async def complete_findings(self, system: str, user: str, max_tokens: int = 2000) -> list[dict]:
         """Send a prompt and get back structured findings via a forced tool call.
 
-        No JSON parsing, no markdown-fence stripping, no silent [] fallback
-        on a malformed response -- the API validates the shape before it
-        ever reaches this code.
+        Checks the disk cache first -- identical (model, system, user)
+        means an identical review request, so there's nothing new to
+        pay for or wait on.
         """
+        cached = cache.get(self.model, system, user)
+        if cached is not None:
+            return cached
+
         response = await self._client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
@@ -61,6 +65,8 @@ class LLMClient:
 
         for block in response.content:
             if block.type == "tool_use" and block.name == "report_findings":
-                return block.input.get("findings", [])
+                findings = block.input.get("findings", [])
+                cache.set(self.model, system, user, findings)
+                return findings
 
         return []
